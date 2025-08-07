@@ -20,8 +20,9 @@ def main():
         robot_description = None
     giskard = Giskard(world_config=GenericWorldConfig(robot_description=robot_description),
                       collision_avoidance_config=LoadSelfCollisionMatrixConfig(
-                          os.path.join(get_package_share_directory('giskardpy_ros'), 'self_collision_matrices',
-                                       'iai', 'tracy.srdf')),
+                          #os.path.join(get_package_share_directory('giskardpy_ros'), 'self_collision_matrices',
+                                       #'iai', 'tracy.srdf')
+                          '/home/zakaria/workspace/ros/src/giskardpy_ros/self_collision_matrices/iai/tracy.srdf'),
                           robot_interface_config=GenericRobotInterface(),
                           behavior_tree_config=StandAloneBTConfig(publish_free_variables=False,
                                                                   publish_tf=True,
