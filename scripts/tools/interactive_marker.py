@@ -1,7 +1,6 @@
 import rclpy
 from geometry_msgs.msg import PoseStamped
 from interactive_markers.interactive_marker_server import InteractiveMarkerServer
-from rclpy import Parameter
 from rclpy.duration import Duration
 from rclpy.time import Time
 from visualization_msgs.msg import InteractiveMarker, InteractiveMarkerControl, Marker
@@ -18,23 +17,28 @@ class InteractiveMarkerNode:
         self.giskard = GiskardWrapperNode('interactive_cartesian_goals')
         tf.init(self.giskard.node_handle)
 
-        # self.giskard.declare_parameters(namespace='',
-        #                                 parameters=[('root_link', Parameter.Type.STRING),
-        #                                             ('tip_link', Parameter.Type.STRING)])
-        self.root_link = 'map'#self.giskard.get_parameter('root_link').value
-        self.tip_link = 'r_gripper_tool_frame'#self.giskard.get_parameter('tip_link').value
+        self.root_link = 'map'
+        self.tip_links = ['r_gripper_tool_frame', 'l_gripper_tool_frame']
 
-        # Create an interactive marker server
         self.server = InteractiveMarkerServer(self.giskard.node_handle, 'cartesian_goals')
+        self.int_markers = {}
 
-        # Create an interactive marker
+        for tip_link in self.tip_links:
+            int_marker = self.create_interactive_marker(tip_link)
+            self.int_markers[tip_link] = int_marker
+            self.server.insert(int_marker)
+            self.server.setCallback(int_marker.name, self.process_feedback)
+
+        self.server.applyChanges()
+
+    def create_interactive_marker(self, tip_link: str) -> InteractiveMarker:
         int_marker = InteractiveMarker()
-        int_marker.header.frame_id = self.tip_link
-        int_marker.name = f'{self.root_link}/{self.tip_link}'
+        int_marker.header.frame_id = tip_link
+        int_marker.name = f'{self.root_link}/{tip_link}'
         int_marker.scale = 0.25
         int_marker.pose.orientation.w = 1.0
 
-        # Create a marker for the interactive marker
+        # Cube visualization
         box_marker = Marker()
         box_marker.type = Marker.CUBE
         box_marker.scale.x = 0.175
@@ -45,38 +49,25 @@ class InteractiveMarkerNode:
         box_marker.color.b = 0.5
         box_marker.color.a = 0.5
 
-        # Create a control that contains the marker
         box_control = InteractiveMarkerControl()
         box_control.always_visible = True
         box_control.markers.append(box_marker)
         box_control.interaction_mode = InteractiveMarkerControl.MOVE_PLANE
-
-        # Add the control to the interactive marker
         int_marker.controls.append(box_control)
 
-        # Create controls to move the marker along all axes
+        # Add 6DOF controls
         self.add_control(int_marker, 'move_x', InteractiveMarkerControl.MOVE_AXIS, 1.0, 0.0, 0.0, 1.0)
         self.add_control(int_marker, 'move_y', InteractiveMarkerControl.MOVE_AXIS, 0.0, 1.0, 0.0, 1.0)
         self.add_control(int_marker, 'move_z', InteractiveMarkerControl.MOVE_AXIS, 0.0, 0.0, 1.0, 1.0)
 
-        # Create controls to rotate the marker around all axes
         self.add_control(int_marker, 'rotate_x', InteractiveMarkerControl.ROTATE_AXIS, 1.0, 0.0, 0.0, 1.0)
         self.add_control(int_marker, 'rotate_y', InteractiveMarkerControl.ROTATE_AXIS, 0.0, 1.0, 0.0, 1.0)
         self.add_control(int_marker, 'rotate_z', InteractiveMarkerControl.ROTATE_AXIS, 0.0, 0.0, 1.0, 1.0)
 
-        # Add the interactive marker to the server
-        self.server.insert(int_marker)
+        return int_marker
 
-        # Set the callback for marker feedback
-        self.server.setCallback(int_marker.name, self.process_feedback)
-
-        # 'commit' changes and send to all clients
-        self.server.applyChanges()
-
-        self.int_marker = int_marker
-
-    def add_control(self, int_marker: InteractiveMarker, name: str, interaction_mode: int, x: float, y: float, z: float,
-                    w: float) -> None:
+    def add_control(self, int_marker: InteractiveMarker, name: str, interaction_mode: int,
+                    x: float, y: float, z: float, w: float) -> None:
         control = InteractiveMarkerControl()
         control.name = name
         control.interaction_mode = interaction_mode
@@ -88,26 +79,28 @@ class InteractiveMarkerNode:
 
     def process_feedback(self, feedback: InteractiveMarkerFeedback) -> None:
         if feedback.event_type == InteractiveMarkerFeedback.MOUSE_UP:
-            self.giskard.node_handle.get_logger().info(f"Marker feedback received: {feedback.event_type}")
+            tip_link = feedback.header.frame_id
+            self.giskard.node_handle.get_logger().info(f"Marker feedback received for {tip_link}")
             goal = PoseStamped()
             goal.header = feedback.header
             goal.pose = feedback.pose
             self.giskard.motion_goals.add_cartesian_pose(goal_pose=goal,
-                                                         tip_link=self.tip_link,
+                                                         tip_link=tip_link,
                                                          root_link=self.root_link)
             self.giskard.motion_goals.allow_all_collisions()
             self.giskard.add_default_end_motion_conditions()
             self.giskard.execute_async()
 
-            # reset marker pose
-            self.int_marker.pose.position.x = 0.0
-            self.int_marker.pose.position.y = 0.0
-            self.int_marker.pose.position.z = 0.0
-            self.int_marker.pose.orientation.x = 0.0
-            self.int_marker.pose.orientation.y = 0.0
-            self.int_marker.pose.orientation.z = 0.0
-            self.int_marker.pose.orientation.w = 1.0
-            self.server.insert(self.int_marker)
+            # Reset marker pose
+            marker = self.int_markers[tip_link]
+            marker.pose.position.x = 0.0
+            marker.pose.position.y = 0.0
+            marker.pose.position.z = 0.0
+            marker.pose.orientation.x = 0.0
+            marker.pose.orientation.y = 0.0
+            marker.pose.orientation.z = 0.0
+            marker.pose.orientation.w = 1.0
+            self.server.insert(marker)
             self.server.applyChanges()
 
 
@@ -121,3 +114,4 @@ def main(args: None = None) -> None:
 
 if __name__ == '__main__':
     main()
+
