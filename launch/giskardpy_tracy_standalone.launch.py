@@ -44,6 +44,8 @@ def generate_launch_description():
             name='giskard_interactive_marker',
             parameters=[{'root_link': 'world',
                          'tip_link': 'left_gripper_tool_frame'}],
+                            ,
+                        'tip_link': 'right_gripper_tool_frame'
             output='screen',
         ),
         # RViz node
