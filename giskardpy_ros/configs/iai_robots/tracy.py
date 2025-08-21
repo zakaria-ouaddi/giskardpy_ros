@@ -34,21 +34,47 @@ class TracyJointTrajServerMujocoInterface(RobotInterfaceConfig):
             namespace='/left_arm/scaled_pos_joint_traj_controller_left')
         self.add_follow_joint_trajectory_server(
             namespace='/right_arm/scaled_pos_joint_traj_controller_right')
+        
 
 
 class TracyStandAloneRobotInterfaceConfig(StandAloneRobotInterfaceConfig):
     def __init__(self):
         super().__init__([
+            # Left arm
             'left_shoulder_pan_joint',
             'left_shoulder_lift_joint',
             'left_elbow_joint',
             'left_wrist_1_joint',
             'left_wrist_2_joint',
             'left_wrist_3_joint',
+            # Right arm
             'right_shoulder_pan_joint',
             'right_shoulder_lift_joint',
             'right_elbow_joint',
             'right_wrist_1_joint',
             'right_wrist_2_joint',
             'right_wrist_3_joint',
+            # Left gripper
+            'left_robotiq_85_base_joint',
+            'left_robotiq_85_left_knuckle_joint',
+            'left_robotiq_85_left_finger_joint',
+            'left_robotiq_85_left_finger_tip_joint',
+            'left_robotiq_85_right_knuckle_joint',
+            'left_robotiq_85_right_finger_joint',
+            'left_robotiq_85_right_finger_tip_joint',
+            'left_robotiq_85_left_inner_knuckle_joint',
+            'left_robotiq_85_right_inner_knuckle_joint',
+            # Right gripper
+            'right_robotiq_85_base_joint',
+            'right_robotiq_85_left_knuckle_joint',
+            'right_robotiq_85_left_finger_joint',
+            'right_robotiq_85_left_finger_tip_joint',
+            'right_robotiq_85_right_knuckle_joint',
+            'right_robotiq_85_right_finger_joint',
+            'right_robotiq_85_right_finger_tip_joint',
+            'right_robotiq_85_left_inner_knuckle_joint',
+            'right_robotiq_85_right_inner_knuckle_joint',
         ])
+        
+        
+
