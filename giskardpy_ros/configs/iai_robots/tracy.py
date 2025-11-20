@@ -125,7 +125,6 @@ class TracyStandAloneRobotInterfaceConfig(StandAloneRobotInterfaceConfig):
 
     def __init__(self):
         super().__init__([
-<<<<<<< HEAD
             # Left arm
             'left_shoulder_pan_joint',
             'left_shoulder_lift_joint',
@@ -164,7 +163,7 @@ class TracyStandAloneRobotInterfaceConfig(StandAloneRobotInterfaceConfig):
         
         
 
-=======
+
             # Left Arm
             'left_shoulder_pan_joint', 'left_shoulder_lift_joint', 'left_elbow_joint',
             'left_wrist_1_joint', 'left_wrist_2_joint', 'left_wrist_3_joint',
@@ -177,4 +176,3 @@ class TracyStandAloneRobotInterfaceConfig(StandAloneRobotInterfaceConfig):
             # Right Gripper (CRITICAL ADDITION)
             'right_robotiq_85_left_knuckle_joint',
         ])
->>>>>>> c53ec8aa (Added gripper joints to controller interface and relaxed self-collision thresholds)
