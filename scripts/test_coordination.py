@@ -1,62 +1,100 @@
 #!/usr/bin/env python3
+import time
+import sys
 import rclpy
-from giskardpy.motion_statechart.motion_statechart import MotionStatechart
-from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, JointState
-from giskardpy.motion_statechart.goals.collision_avoidance import CollisionAvoidance
-from giskardpy.model.collision_matrix_manager import CollisionRequest, CollisionAvoidanceTypes
-from giskardpy.motion_statechart.graph_node import EndMotion
-from rclpy.action import ActionClient
 from rclpy.node import Node
+from rclpy.action import ActionClient
 from control_msgs.action import GripperCommand
 from geometry_msgs.msg import PoseStamped
 from tf_transformations import quaternion_from_euler
-import time
 
-# Import our Motion Engine
-# Note: This assumes you run this script from the same directory, 
-# or that motion_engine is in your PYTHONPATH.
-from motion_engine import GiskardMotionEngine
-
-# --- Gripper Controller (The "Other System") ---
-class GripperController:
-    def __init__(self, action_server='/right_gripper/robotiq_gripper_controller/gripper_cmd', node_name='gripper_test_client'):
-        self.node = rclpy.create_node(node_name)
-        # Adjust these topic names to match your real robot
-        self.left_client = ActionClient(self.node, GripperCommand, action_server)
-        
-    def command(self, position: float, effort: float = 20.0):
-        """ 0.0 = Open, 0.8 = Closed """
-        print(f"Gripper: Moving to {position}...")
-        if not self.left_client.wait_for_server(timeout_sec=2.0):
-            print("Gripper server not found! Skipping gripper command.")
-            return
-
-        goal = GripperCommand.Goal()
-        goal.command.position = position
-        goal.command.max_effort = effort
-        
-        future = self.left_client.send_goal_async(goal)
-        rclpy.spin_until_future_complete(self.node, future)
-        # In a real script, wait for result...
-        time.sleep(1.0) # Simulate wait
-        print("Gripper: Done.")
-
-    def destroy(self):
-        self.node.destroy_node()
-
+# Giskard / Semantic Digital Twin Imports
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.world_entity import Body
-from semantic_digital_twin.spatial_types import TransformationMatrix
+import semantic_digital_twin.spatial_types.spatial_types as cas
 
-# ... Helper to create poses ...
-def create_pose(x, y, z, roll=0, pitch=0, yaw=0, frame="map2"):
+# Local Motion Engine Import
+try:
+    from motion_engine import GiskardMotionEngine
+except ImportError:
+    print("Error: 'motion_engine.py' not found. Ensure it is in the PYTHONPATH or local dir.")
+    sys.exit(1)
+
+# --- CONFIGURATION ---
+# UPDATED: Using the RIGHT gripper topic
+GRIPPER_TOPIC = '/right_gripper/robotiq_gripper_controller/gripper_cmd'
+ROBOT_TIP_LINK = "r_gripper_tool_frame"
+WORLD_FRAME = "map2"
+
+OBJECT_NAME = "milk_box"
+TABLE_NAME = "table"
+
+# --- UPDATED ROBUST GRIPPER CONTROLLER ---
+class RobustGripperController:
+    def __init__(self, node: Node, action_topic: str):
+        self.node = node
+        self.client = ActionClient(self.node, GripperCommand, action_topic)
+        self.logger = self.node.get_logger()
+        
+        self.logger.info(f"Waiting for gripper server: {action_topic}...")
+        if not self.client.wait_for_server(timeout_sec=5.0):
+            self.logger.error(f"Error: Server '{action_topic}' not found. Is the driver running?")
+            # We don't exit here to allow the script to try anyway, but it's risky
+        else:
+            self.logger.info("Gripper server connected.")
+
+    def command(self, position: float, effort: float = 50.0):
+        """
+        Sends command and checks if we stalled (grasped object) or reached goal (air).
+        """
+        goal = GripperCommand.Goal()
+        goal.command.position = float(position)
+        goal.command.max_effort = float(effort)
+
+        self.logger.info(f"Gripper: Sending command Pos={position}, Effort={effort}")
+
+        # 1. Send Goal
+        goal_future = self.client.send_goal_async(goal)
+        rclpy.spin_until_future_complete(self.node, goal_future)
+        goal_handle = goal_future.result()
+
+        if not goal_handle or not goal_handle.accepted:
+            self.logger.error("Gripper Command REJECTED by server.")
+            return False
+
+        # 2. Wait for Result
+        result_future = goal_handle.get_result_async()
+        rclpy.spin_until_future_complete(self.node, result_future)
+        result = result_future.result().result
+
+        # 3. Analyze Result
+        success = False
+        self.logger.info(f"Gripper Finished. Pos: {result.position:.4f}")
+        
+        if result.stalled:
+            self.logger.info("SUCCESS: Gripper stalled (Object detected!)")
+            success = True
+        elif result.reached_goal:
+            # If we wanted to close fully (0.8), this is success.
+            # If we wanted to grasp an object at 0.55, but reached 0.55 without stalling, 
+            # it might mean the object is smaller than expected or missing.
+            if position > 0.05: # If not opening
+                self.logger.warning("WARNING: Gripper reached target without stalling. Missed object?")
+            else:
+                self.logger.info("Gripper opened successfully.")
+            success = True
+        
+        return success
+
+# --- HELPER FUNCTIONS ---
+def create_pose(x, y, z, roll=0.0, pitch=0.0, yaw=0.0, frame=WORLD_FRAME) -> PoseStamped:
     p = PoseStamped()
     p.header.frame_id = frame
-    p.pose.position.x = x
-    p.pose.position.y = y
-    p.pose.position.z = z
+    p.pose.position.x = float(x)
+    p.pose.position.y = float(y)
+    p.pose.position.z = float(z)
     q = quaternion_from_euler(roll, pitch, yaw)
     p.pose.orientation.x = q[0]
     p.pose.orientation.y = q[1]
@@ -64,17 +102,10 @@ def create_pose(x, y, z, roll=0, pitch=0, yaw=0, frame="map2"):
     p.pose.orientation.w = q[3]
     return p
 
-import semantic_digital_twin.spatial_types.spatial_types as cas
-
-def add_box(world, name, size, pose_stamped):
-    # Manual conversion
+def add_box_to_giskard(world, name, size, pose_stamped: PoseStamped):
     p = cas.Point3(pose_stamped.pose.position.x, pose_stamped.pose.position.y, pose_stamped.pose.position.z)
-    q = cas.Quaternion(
-        pose_stamped.pose.orientation.x, 
-        pose_stamped.pose.orientation.y, 
-        pose_stamped.pose.orientation.z, 
-        pose_stamped.pose.orientation.w
-    )
+    q = cas.Quaternion(pose_stamped.pose.orientation.x, pose_stamped.pose.orientation.y, 
+                       pose_stamped.pose.orientation.z, pose_stamped.pose.orientation.w)
     parent_T_pose = cas.TransformationMatrix.from_point_rotation_matrix(p, q.to_rotation_matrix())
     
     with world.modify_world():
@@ -82,112 +113,75 @@ def add_box(world, name, size, pose_stamped):
         box_shape = Box(scale=Scale(*size))
         box.collision.append(box_shape)
         box.visual.append(box_shape)
-        
-        connection = FixedConnection(
-            parent=world.root,
-            child=box,
-            parent_T_connection_expression=parent_T_pose,
-        )
+        connection = FixedConnection(parent=world.root, child=box, parent_T_connection_expression=parent_T_pose)
         world.add_connection(connection)
 
+# --- MAIN ---
 def main():
     rclpy.init()
-    # 1. Setup
-    # Use Left Gripper
-    gripper = GripperController(action_server="/right_gripper/gripper_cmd")
+    test_node = rclpy.create_node('pick_place_test_node')
     
-    # Use Left Arm Tip Link
-    motion = GiskardMotionEngine(tip_link="r_gripper_tool_frame")
-
-    # 2. Add Object to World (Left side)
-    obj_name = "milk_box"
-    obj_pose = create_pose(0.8, -0.2, 1) # y=0.4 is on the left
-    
-    # Add box (using GiskardTester utility or similar logic if available, 
-    # but here we use the motion engine's world interface if we had one, 
-    # or just assume it's there. 
-    # For this test script, we just define the pose for the robot to go to.)
-    # In a real test, we might want to spawn it. 
-    # But let's assume the user just wants the robot to move to these coords.
-    add_box(motion.giskard.world, obj_name, (0.05, 0.05, 0.05), obj_pose)
-    
-    # 3. Define Poses (Simulating "Planning Team" Output)
-    # Pick Sequence (Left side)
-    # Pre-pick: 20cm above object
-    # Pitch=3.14 for top-down (pointing down, rotated 180 deg relative to roll=3.14)
-    pose_pre_pick = create_pose(0.8, -0.2, 1.1, pitch=3.14,yaw=1.57)
-    # Pick: At object
-    pose_pick     = create_pose(0.8, -0.2, 1, pitch=3.14,yaw=1.57)
-    
-    # Place Sequence (Left side)
-    pose_lift      = create_pose(0.8, -0.2, 1.2, pitch=3.14,yaw=1.57)
-    pose_pre_place = create_pose(0.8, 0.2, 1.2, pitch=3.14,yaw=1.57)
-    pose_place     = create_pose(0.8, 0.2, 1.1, pitch=3.14,yaw=1.57)
-    pose_retreat   = create_pose(0.8, 0.2, 1.2, pitch=3.14,yaw=1.57)
-
     try:
+        # 1. Setup
+        # Initialize the NEW Robust Gripper Controller
+        gripper = RobustGripperController(test_node, action_topic=GRIPPER_TOPIC)
+        motion = GiskardMotionEngine(tip_link=ROBOT_TIP_LINK)
+
+        # 2. Add Object
+        obj_pose = create_pose(0.8, -0.2, 1.0) 
+        add_box_to_giskard(motion.giskard.world, OBJECT_NAME, (0.05, 0.05, 0.05), obj_pose)
+        
+        # 3. Define Poses
+        common_pitch = 3.14
+        common_yaw = 1.57
+
+        pose_pre_pick = create_pose(0.8, -0.2, 1.20, pitch=common_pitch, yaw=common_yaw)
+        pose_pick     = create_pose(0.8, -0.2, 0.95, pitch=common_pitch, yaw=common_yaw)
+        pose_lift     = create_pose(0.8, -0.2, 1.20, pitch=common_pitch, yaw=common_yaw)
+        pose_place    = create_pose(0.8, -0.3, 0.95, pitch=common_pitch, yaw=common_yaw)
+
         print("--- STARTING TEST ---")
 
         # A. Open Gripper
-        print("Gripper: Moving to 0.0...")
-        gripper.command(0.0)
+        gripper.command(position=0.0, effort=50.0)
 
-        # B. Move to Pick (Smooth Sequence: Pre -> Pick)
-        print("Motion: Executing Pick Sequence (Pre -> Pick)...")
-        # We tell it to allow collision with 'milk_box' because we are touching it
-        motion.execute_smooth_sequence([pose_pre_pick, pose_pick], object_to_allow_collision=obj_name)
-        # execute_with_all_collisions(motion, [pose_pre_pick, pose_pick])
-        print("Motion: Pick Sequence Complete.")
+        # B. Move to Pick
+        print("Motion: Moving to Pick...")
+        motion.execute_smooth_sequence([pose_pre_pick, pose_pick], object_to_allow_collision=OBJECT_NAME)
 
-        # C. Close Gripper
+        # C. Close Gripper (Using your specific settings)
         print("Gripper: Closing...")
-        gripper.command(0.8)
-        #test test haha
-        # Attach object in Giskard World so it moves with us
-        motion.attach_object(obj_name, motion.tip_link)
-
-        # D. Lift & Move to Place (Split into steps for debugging)
-        print("Motion: Executing Lift...")
-        # Allow collision with "table" because the box is sitting on it when we start lifting
-        motion.move_to_pose(
-            pose_lift, 
-            object_to_allow_collision=obj_name,
-            environment_objects_to_allow_collision=["table"]
-        )
-        # execute_with_all_collisions(motion, [pose_lift])
+        # 0.55 = Target (Strong Grip), 50.0 = Force
+        grasped = gripper.command(position=0.55, effort=50.0)
         
-        print("Motion: Executing Pre-Place...")
-        motion.move_to_pose(pose_pre_place, object_to_allow_collision=obj_name)
-        # execute_with_all_collisions(motion, [pose_pre_place])
-        
-        print("Motion: Executing Place...")
-        motion.move_to_pose(
-            pose_place, 
-            object_to_allow_collision=obj_name,
-            environment_objects_to_allow_collision=["table"]
-        )
-        # execute_with_all_collisions(motion, [pose_place])
-        print("Motion: Place Sequence Complete.")
+        if not grasped:
+            print("CRITICAL WARNING: Gripper did not grasp correctly. Aborting lift?")
+            # In a real scenario, you might want to stop here:
+            # return 
 
-        # E. Open Gripper
-        print("Gripper: Opening...")
-        gripper.command(0.0)
-        
-        # Detach
-        motion.detach_object(obj_name)
+        motion.attach_object(OBJECT_NAME, ROBOT_TIP_LINK)
 
-        # F. Retreat
-        print("Motion: Retreating...")
-        motion.move_to_pose(pose_retreat)
-        # execute_with_all_collisions(motion, [pose_retreat])
+        # D. Lift & Place
+        print("Motion: Lifting...")
+        motion.move_to_pose(pose_lift, object_to_allow_collision=OBJECT_NAME, environment_objects_to_allow_collision=[TABLE_NAME])
+        
+        print("Motion: Placing...")
+        motion.move_to_pose(pose_place, object_to_allow_collision=OBJECT_NAME, environment_objects_to_allow_collision=[TABLE_NAME])
+
+        # E. Release
+        print("Gripper: Releasing...")
+        gripper.command(position=0.0, effort=50.0)
+        motion.detach_object(OBJECT_NAME)
 
         print("--- TEST COMPLETE ---")
 
     except KeyboardInterrupt:
         pass
+    except Exception as e:
+        print(f"Error: {e}")
     finally:
-        gripper.destroy()
-        motion.destroy()
+        if 'motion' in locals(): motion.destroy()
+        if 'test_node' in locals(): test_node.destroy_node()
         rclpy.shutdown()
 
 if __name__ == '__main__':
