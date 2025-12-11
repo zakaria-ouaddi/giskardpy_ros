@@ -142,7 +142,7 @@ def main():
         # C. Close Gripper
         print("Gripper: Closing...")
         gripper.command(0.8)
-        
+        #test test haha
         # Attach object in Giskard World so it moves with us
         motion.attach_object(obj_name, motion.tip_link)
 
