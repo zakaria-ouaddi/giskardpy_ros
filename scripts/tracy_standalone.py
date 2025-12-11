@@ -10,7 +10,23 @@ from giskardpy_ros.configs.iai_robots.tracy import (
     TracyStandAloneRobotInterfaceConfig,
 )
 from giskardpy_ros.utils.utils import load_xacro
+from giskardpy_ros.tree.blackboard_utils import GiskardBlackboard
+import traceback
 
+INITIAL_JOINT_POSITIONS = {
+    "left_shoulder_pan_joint": 2.92,
+    "right_shoulder_pan_joint": 3.35,
+    "left_shoulder_lift_joint": -1.24,
+    "right_shoulder_lift_joint": -1.90,
+    "left_elbow_joint": 1.90,
+    "right_elbow_joint": -1.90,
+    "left_wrist_1_joint": -1.57,
+    "right_wrist_1_joint": -1.57,
+    "left_wrist_2_joint": -0.5,
+    "right_wrist_2_joint": 0.5,
+    "left_wrist_3_joint": 0.0,
+    "right_wrist_3_joint": 0.0,
+}
 
 def main():
     rospy.init_node("giskard")
@@ -23,13 +39,33 @@ def main():
     giskard = Giskard(
         world_config=WorldWithTracyConfig(urdf=robot_description),
         robot_interface_config=TracyStandAloneRobotInterfaceConfig(),
-        behavior_tree_config=StandAloneBTConfig(
-            publish_tf=True, publish_js=False, debug_mode=True
-        ),
+        behavior_tree_config=StandAloneBTConfig(publish_tf=True, debug_mode=True),
         qp_controller_config=QPControllerConfig(control_dt=0.03, mpc_dt=0.03),
-        collision_checker_id=CollisionCheckerLib.bpb
+        collision_checker_id=CollisionCheckerLib.bpb,
     )
-    giskard.live()
+    
+    try:
+        giskard.setup()
+        
+        # Set initial positions
+        initial_joint_state = {}
+        for joint_name, position in INITIAL_JOINT_POSITIONS.items():
+            try:
+                joint = giskard.world_config.world.get_connection_by_name(joint_name)
+                initial_joint_state[joint] = position
+            except Exception as e:
+                print(f"Skipping initial pos for {joint_name}: {e}")
+                
+        if initial_joint_state:
+            giskard.world_config.world.set_positions_1DOF_connection(initial_joint_state)
+            print("Initial joint positions set.")
+            
+        GiskardBlackboard().tree.live()
+        
+    except Exception as e:
+        traceback.print_exc()
+        import rclpy
+        rclpy.shutdown()
 
 
 if __name__ == "__main__":
