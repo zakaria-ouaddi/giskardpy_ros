@@ -101,7 +101,7 @@ def main():
 
     # 2. Add Object to World (Left side)
     obj_name = "milk_box"
-    obj_pose = create_pose(0.8, -0.2, 0.9) # y=0.4 is on the left
+    obj_pose = create_pose(0.8, -0.2, 1) # y=0.4 is on the left
     
     # Add box (using GiskardTester utility or similar logic if available, 
     # but here we use the motion engine's world interface if we had one, 
@@ -115,15 +115,15 @@ def main():
     # Pick Sequence (Left side)
     # Pre-pick: 20cm above object
     # Pitch=3.14 for top-down (pointing down, rotated 180 deg relative to roll=3.14)
-    pose_pre_pick = create_pose(0.8, -0.2, 1.1, pitch=3.14)
+    pose_pre_pick = create_pose(0.8, -0.2, 1.1, pitch=3.14,yaw=1.57)
     # Pick: At object
-    pose_pick     = create_pose(0.8, -0.2, 0.9, pitch=3.14)
+    pose_pick     = create_pose(0.8, -0.2, 1, pitch=3.14,yaw=1.57)
     
     # Place Sequence (Left side)
-    pose_lift      = create_pose(0.8, -0.2, 1.2, pitch=3.14)
-    pose_pre_place = create_pose(0.8, 0.2, 1.2, pitch=3.14)
-    pose_place     = create_pose(0.8, 0.2, 1.0, pitch=3.14)
-    pose_retreat   = create_pose(0.8, 0.2, 1.2, pitch=3.14)
+    pose_lift      = create_pose(0.8, -0.2, 1.2, pitch=3.14,yaw=1.57)
+    pose_pre_place = create_pose(0.8, 0.2, 1.2, pitch=3.14,yaw=1.57)
+    pose_place     = create_pose(0.8, 0.2, 1.1, pitch=3.14,yaw=1.57)
+    pose_retreat   = create_pose(0.8, 0.2, 1.2, pitch=3.14,yaw=1.57)
 
     try:
         print("--- STARTING TEST ---")
