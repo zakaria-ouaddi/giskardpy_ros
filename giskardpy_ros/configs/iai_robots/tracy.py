@@ -13,6 +13,7 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.spatial_types.derivatives import Derivatives
 from semantic_digital_twin.robots.tracy import Tracy
 from semantic_digital_twin.adapters.urdf import URDFParser
+from semantic_digital_twin.world_description.connections import ActiveConnection
 from semantic_digital_twin.world_description.world_entity import CollisionCheckingConfig
 
 if TYPE_CHECKING:
@@ -65,9 +66,38 @@ class WorldWithTracyConfig(WorldWithFixedRobot):
 
         for body in self.robot.bodies_with_collisions:
             collision_config = CollisionCheckingConfig(
-                buffer_zone_distance=0.03, violated_distance=0.0
+                buffer_zone_distance=0.003, violated_distance=0.0
             )
             body.set_static_collision_config(collision_config)
+
+
+
+
+
+        gripper_joints = [
+            "left_robotiq_85_left_knuckle_joint",
+            "left_robotiq_85_right_knuckle_joint",
+            "left_robotiq_85_left_inner_knuckle_joint",
+            "left_robotiq_85_right_inner_knuckle_joint",
+            "left_robotiq_85_left_finger_tip_joint",
+            "left_robotiq_85_right_finger_tip_joint",
+            "right_robotiq_85_left_knuckle_joint",
+            "right_robotiq_85_right_knuckle_joint",
+            "right_robotiq_85_left_inner_knuckle_joint",
+            "right_robotiq_85_right_inner_knuckle_joint",
+            "right_robotiq_85_left_finger_tip_joint",
+            "right_robotiq_85_right_finger_tip_joint",
+        ]
+        for joint_name in gripper_joints:
+            connection: ActiveConnection = self.world.get_connection_by_name(joint_name)
+            collision_config = CollisionCheckingConfig(
+                buffer_zone_distance=0.01, violated_distance=0.0, max_avoided_bodies=1
+            )
+            connection.set_static_collision_config_for_direct_child_bodies(
+                collision_config
+            )
+
+
 
     def setup_world(self, robot_name: Optional[str] = None) -> None:
         super().setup_world()
