@@ -20,10 +20,7 @@ def generate_launch_description():
         [FindExecutable(name='xacro'), ' ', tracy_xacro_file])
 
     return LaunchDescription([
-        # Static transform publisher (example, modify as needed for your robot)
-        #IncludeLaunchDescription(
-        #    PythonLaunchDescriptionSource(upload_pr2_launch)
-        #),
+        # Static transform publisher (map -> world)
         Node(
             package='tf2_ros',
             executable='static_transform_publisher',
@@ -31,6 +28,7 @@ def generate_launch_description():
             output='screen',
             arguments=['0', '0', '0', '0', '0', '0', 'map', 'world']
         ),
+        # Giskard Core
         Node(
             package='giskardpy_ros',
             executable='tracy_standalone',
@@ -38,12 +36,12 @@ def generate_launch_description():
             parameters=[{'robot_description': robot_description}],
             output='screen',
         ),
+        # Interactive Marker Node
+        # (Parameters removed because they are now handled inside the interactive_marker script)
         Node(
             package='giskardpy_ros',
             executable='interactive_marker',
             name='giskard_interactive_marker',
-            parameters=[{'root_link': 'map',
-                         'tip_link': 'l_gripper_tool_frame'}],
             output='screen',
         ),
         # RViz node
@@ -54,4 +52,3 @@ def generate_launch_description():
             output='screen',
         ),
     ])
-
