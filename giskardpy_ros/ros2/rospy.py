@@ -81,7 +81,8 @@ def init_node(node_name: str) -> None:
     if node is not None:
         get_middleware().logwarn("ros node already initialized.")
         return
-    rclpy.init()
+    if not rclpy.ok():
+        rclpy.init()
     node = Node(node_name)
     spinner_thread = Thread(target=heart, daemon=True, name="rclpy spin")
     set_middleware(ROS2Wrapper())
