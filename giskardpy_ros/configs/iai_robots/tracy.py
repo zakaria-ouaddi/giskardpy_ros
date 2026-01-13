@@ -91,7 +91,7 @@ class WorldWithTracyConfig(WorldWithFixedRobot):
         for joint_name in gripper_joints:
             connection: ActiveConnection = self.world.get_connection_by_name(joint_name)
             collision_config = CollisionCheckingConfig(
-                buffer_zone_distance=0.01, violated_distance=0.0, max_avoided_bodies=1
+                buffer_zone_distance=0.03, violated_distance=0.0, max_avoided_bodies=1
             )
             connection.set_static_collision_config_for_direct_child_bodies(
                 collision_config
