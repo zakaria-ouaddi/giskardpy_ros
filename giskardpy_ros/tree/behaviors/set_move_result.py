@@ -33,11 +33,16 @@ class SetMoveResult(GiskardBehavior):
                 GiskardBlackboard().move_action_server.set_aborted()
             case None:
                 GiskardBlackboard().move_action_server.set_succeeded()
+            case _:
+                get_middleware().logerr(f"Unhandled exception in SetMoveResult: {type(e)} - {e}")
+                GiskardBlackboard().move_action_server.set_aborted()
 
-        result = {
-            "life_cycle_state": GiskardBlackboard().motion_statechart.life_cycle_state.to_json(),
-            "observation_state": GiskardBlackboard().motion_statechart.observation_state.to_json(),
-        }
+        result = {}
+        if hasattr(GiskardBlackboard().executor, "motion_statechart") and GiskardBlackboard().executor.motion_statechart is not None:
+            result = {
+                "life_cycle_state": GiskardBlackboard().motion_statechart.life_cycle_state.to_json(),
+                "observation_state": GiskardBlackboard().motion_statechart.observation_state.to_json(),
+            }
 
         move_result.result = json.dumps(result)
         if isinstance(e, ExecutionCanceledException):

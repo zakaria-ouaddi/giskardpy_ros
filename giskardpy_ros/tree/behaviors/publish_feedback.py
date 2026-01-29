@@ -21,6 +21,8 @@ class PublishFeedback(GiskardBehavior):
         self.last_history_length = -1
 
     def has_state_changed(self):
+        if not hasattr(GiskardBlackboard().executor, "motion_statechart") or GiskardBlackboard().executor.motion_statechart is None:
+             return False
         history_length = len(GiskardBlackboard().motion_statechart.history)
         has_changed = self.last_history_length != history_length
         if has_changed:
@@ -32,6 +34,9 @@ class PublishFeedback(GiskardBehavior):
 
     @record_time
     def update(self):
+        if not hasattr(GiskardBlackboard().executor, "motion_statechart") or GiskardBlackboard().executor.motion_statechart is None:
+             return Status.SUCCESS
+
         data = {}
         if self.has_new_goal():
             self.last_goal_id = self.move_action_server.goal_id
@@ -64,6 +69,9 @@ class ForcePublishFeedback(GiskardBehavior):
 
     @record_time
     def update(self):
+        if not hasattr(GiskardBlackboard().executor, "motion_statechart") or GiskardBlackboard().executor.motion_statechart is None:
+             return Status.SUCCESS
+
         data = {
             "goal_id": self.move_action_server.goal_id,
             "life_cycle_state": GiskardBlackboard().motion_statechart.life_cycle_state.to_json(),

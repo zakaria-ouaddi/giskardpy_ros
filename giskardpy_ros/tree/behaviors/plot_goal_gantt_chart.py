@@ -209,6 +209,8 @@ class PlotGanttChart(GiskardBehavior):
 
     @record_time
     def update(self):
+        if not hasattr(GiskardBlackboard().executor, "motion_statechart") or GiskardBlackboard().executor.motion_statechart is None:
+             return Status.SUCCESS
         if not GiskardBlackboard().motion_statechart.monitor_state_history:
             return Status.SUCCESS
         try:

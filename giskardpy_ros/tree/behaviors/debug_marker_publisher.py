@@ -17,6 +17,8 @@ class DebugMarkerPublisher(GiskardBehavior):
 
     @record_time
     def update(self):
+        if not hasattr(GiskardBlackboard().executor, "motion_statechart") or GiskardBlackboard().executor.motion_statechart is None:
+             return Status.SUCCESS
         GiskardBlackboard().debug_marker_visualizer.publish_markers(
             motion_statechart=GiskardBlackboard().motion_statechart
         )

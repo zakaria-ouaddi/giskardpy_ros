@@ -40,6 +40,31 @@ class ParseActionGoal(GiskardBehavior):
         )
         kwargs = tracker.create_kwargs()
         kwargs["world"] = GiskardBlackboard().executor.world
+        
+        # Add Name-based lookup for entities to support Clients sending Names as IDs
+        world = GiskardBlackboard().executor.world
+        
+        # Debugging: List all entities available in the world
+        entity_names = []
+        for entity in world.kinematic_structure_entities:
+            # 1. Full string (e.g. "prefix/name")
+            key_full = str(entity.name)
+            tracker._kinematic_structure_entities[key_full] = entity
+            entity_names.append(key_full)
+            
+            # 2. Raw name string (e.g. "name")
+            if hasattr(entity.name, 'name'):
+                tracker._kinematic_structure_entities[str(entity.name.name)] = entity
+                entity_names.append(str(entity.name.name))
+
+            # 3. Explicit construction if PrefixedName
+            if hasattr(entity.name, 'prefix') and entity.name.prefix:
+                 key_constructed = f"{entity.name.prefix}/{entity.name.name}"
+                 tracker._kinematic_structure_entities[key_constructed] = entity
+                 entity_names.append(key_constructed)
+
+        get_middleware().loginfo(f"DEBUG: Available Entity Keys in Kwargs: {entity_names}")
+
         motion_statechart = MotionStatechart.from_json(
             json.loads(move_goal.goal), **kwargs
         )

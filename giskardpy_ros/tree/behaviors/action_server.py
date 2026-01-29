@@ -30,6 +30,7 @@ class ActionServerHandler:
         self.goal_id = -1
         self.goal_msg = None
         self._result_msg = None
+        self.payload = None
         self.client_alive_checker = None
         self.goal_queue = Queue(1)
         self.result_queue = Queue(1)
