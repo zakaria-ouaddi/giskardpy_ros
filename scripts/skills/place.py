@@ -66,19 +66,17 @@ class PlaceSkill(BaseSkill):
             # 2. Move to Place
             # Allow collision with the stack we are placing on
             # Logic: We are holding 'object_name', and we want to place it on 'stack_on' objects.
-            # calculate allow list
             
-            # We need to allow collision between the HELD object and the STACK environments.
-            # The engine helper `move_to_pose` handles this via `environment_objects_to_allow_collision`.
-            
-            # Also, we might want to allow the gripper to touch the stack? Maybe not necessary if grasping high enough.
-            # But definitely allow object <-> stack.
-            
-            # Explicitly setting allowance before move, though move_to_pose does it too.
-            # The previous script did a loop of allow_collision([name], c_env).
+            # IMPLICITLY ALLOW TABLE: "tracy/table" or "table"
+            # It's a place action, usually on a table.
+            local_stack_on = list(stack_on)
+            if "tracy/table" not in local_stack_on:
+                 local_stack_on.append("tracy/table")
+            if "table" not in local_stack_on:
+                 local_stack_on.append("table")
             
             # Robustness Fix: Allow Gripper to touch Stack
-            for stack_obj in stack_on:
+            for stack_obj in local_stack_on:
                 try:
                     self.engine.allow_all_gripper_collisions(stack_obj)
                 except Exception:
@@ -87,7 +85,7 @@ class PlaceSkill(BaseSkill):
             self.engine.move_to_pose(
                 target_pose,
                 object_to_allow_collision=object_name,
-                environment_objects_to_allow_collision=stack_on,
+                environment_objects_to_allow_collision=local_stack_on,
                 linear_speed=self.config.LINEAR_SPEED, 
                 angular_speed=self.config.ANGULAR_SPEED,
                 tip_link=tip_link
@@ -104,7 +102,7 @@ class PlaceSkill(BaseSkill):
             self.engine.move_to_pose(
                 pre_place_pose,
                 object_to_allow_collision=object_name,
-                environment_objects_to_allow_collision=stack_on,
+                environment_objects_to_allow_collision=local_stack_on,
                 linear_speed=self.config.LINEAR_SPEED, 
                 angular_speed=self.config.ANGULAR_SPEED,
                 tip_link=tip_link

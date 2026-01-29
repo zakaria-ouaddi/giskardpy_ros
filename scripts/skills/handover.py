@@ -156,14 +156,37 @@ class HandoverSkill(BaseSkill):
             )
             
             # 6. Phase 3: Transfer Logic
-            print("Phase 3: Transferring...")
-            # Use SOFT effort to prevent snapping
-            self.close_gripper(execution_receiver, effort=self.config.GRIPPER_EFFORT_SOFT)
+            print("Phase 3: Transferring (Coordinated Release)...")
+            
+            # Step A: Receiver Close (Start closing)
+            # We command it to close, but we don't block yet (managed by controller or we assume async behavior)
+            # Note: gripper_cmd is async on the wire, but our wrapper is simple.
+            # To be safe and rapid, we call them sequentially but without explicit sleeps between.
+            
+            print(f"  -> Receiver {execution_receiver} Closing...")
+            if self.gripper_callback:
+                self.gripper_callback(execution_receiver, self.config.GRIPPER_CLOSE, effort=self.config.GRIPPER_EFFORT_DEFAULT)
+            
+            # Step B: Giver Slack (Immediately Relax/Slight Open)
+            # "Open slightly" -> If 0.0 is Open and 0.4 is Closed, 0.3 is slightly open.
+            # We use a slightly looser position to allow slip, but maintain some grasp (don't drop).
+            # We also reduce effort to minimize fighting force.
+            # Default Close is 0.4. Let's try 0.35 (Just a bit looser) + Low Effort.
+            SLIGHT_OPEN_VAL = 0.33 
+            
+            print(f"  -> Giver {execution_giver} Loosening to {SLIGHT_OPEN_VAL}...")
+            if self.gripper_callback:
+                self.gripper_callback(execution_giver, SLIGHT_OPEN_VAL, effort=self.config.GRIPPER_EFFORT_SOFT)
+            
+            # Step C: Wait for transfer to settle
+            time.sleep(1.0)
             
             # Kinematic Switch
             self.engine.detach_object(obj_name)
             self.engine.attach_object(obj_name, receiver_tip)
             
+            # Step D: Full Release
+            print(f"  -> Giver {execution_giver} Opening Full...")
             self.open_gripper(execution_giver)
             
             # 7. Phase 4: Separation (Giver Retreats)
