@@ -43,7 +43,6 @@ class TracyVelocityInterface(RobotInterfaceConfig):
         self.add_joint_velocity_group_controller(cmd_topic='/right_arm/forward_velocity_controller/commands',
                                                  connections=joints_right)
 
-
 class WorldWithTracyConfig(WorldWithFixedRobot):
     """Minimal Tracy world config analogous to WorldWithPR2Config.
 
@@ -59,14 +58,18 @@ class WorldWithTracyConfig(WorldWithFixedRobot):
         )
 
     def setup_collision_config(self):
-        path_to_srdf = resource_filename(
-            "giskardpy", "../self_collision_matrices/iai/tracy.srdf"
+        from ament_index_python.packages import get_package_share_directory
+        import os
+        path_to_srdf = os.path.join(
+            get_package_share_directory("giskardpy_ros"), 
+            "self_collision_matrices/iai/tracy.srdf"
         )
+        print(f"DEBUG: Loading SRDF from {path_to_srdf}")
         self.world.load_collision_srdf(path_to_srdf)
 
         for body in self.robot.bodies_with_collisions:
             collision_config = CollisionCheckingConfig(
-                buffer_zone_distance=0.003, violated_distance=0.0
+                buffer_zone_distance=0.003, violated_distance=0.001
             )
             body.set_static_collision_config(collision_config)
 
@@ -91,7 +94,7 @@ class WorldWithTracyConfig(WorldWithFixedRobot):
         for joint_name in gripper_joints:
             connection: ActiveConnection = self.world.get_connection_by_name(joint_name)
             collision_config = CollisionCheckingConfig(
-                buffer_zone_distance=0.03, violated_distance=0.0, max_avoided_bodies=1
+                buffer_zone_distance=0.03, violated_distance=0.001, max_avoided_bodies=1
             )
             connection.set_static_collision_config_for_direct_child_bodies(
                 collision_config
