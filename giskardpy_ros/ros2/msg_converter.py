@@ -269,9 +269,12 @@ def world_to_tf_message(world: World, include_prefix: bool) -> tf2_msgs.TFMessag
     tf_msg.transforms = create_tf_message_batch(
         len(world._forward_kinematic_manager.tf)
     )
-    for i, (parent_link_name, child_link_name) in enumerate(
+    for i, (parent_id, child_id) in enumerate(
         world._forward_kinematic_manager.tf
     ):
+        parent_link_name = world.get_kinematic_structure_entity_by_id(parent_id).name
+        child_link_name = world.get_kinematic_structure_entity_by_id(child_id).name
+
         pose = tf[i]
         if not include_prefix:
             parent_link_name = parent_link_name.name
