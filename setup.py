@@ -9,7 +9,7 @@ data_files = [
     ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
     ("share/" + package_name, ["package.xml"]),
 ]
-for dirpath, _, filenames in itertools.chain(os.walk("data"), os.walk("launch")):
+for dirpath, _, filenames in itertools.chain(os.walk("data"), os.walk("launch"), os.walk("self_collision_matrices")):
     full_paths = [os.path.join(dirpath, f) for f in filenames]
     install_path = os.path.join("share", package_name, dirpath)
     data_files.append((install_path, full_paths))
