@@ -14,7 +14,7 @@ class DualArmConfig:
     
     # Gripper Limits
     GRIPPER_OPEN: float = 0.0
-    GRIPPER_CLOSE: float = 0.4
+    GRIPPER_CLOSE: float = 0.35
     GRIPPER_EFFORT_DEFAULT: float = 10.0
     GRIPPER_EFFORT_SOFT: float = 2.0
 
@@ -40,3 +40,18 @@ class DualArmConfig:
     # Refined Heights
     PICK_APPROACH_HEIGHT: float = 0.20
     PLACE_RETREAT_HEIGHT: float = 0.20
+
+    # Screw / Assembly Config
+    SCREW_TORQUE_LIMIT: float = 5.0 # Nm, needs tuning based on robot
+    SCREW_PITCH: float = 0.001 # 1mm per rotation
+    SCREW_ADVANCE_SPEED: float = 0.005 # m/s
+    SCREW_ROTATION_SPEED: float = 1.0 # rad/s
+
+    # Push / Snap Config
+    PUSH_FORCE_LIMIT: float = 20.0 # N
+    PUSH_DISTANCE: float = 0.05
+    PUSH_SPEED: float = 0.02
+
+    # Tool Config
+    # Default offset from gripper tip to tool tip (e.g. screwdriver length)
+    TOOL_OFFSET_Z: float = 0.15 

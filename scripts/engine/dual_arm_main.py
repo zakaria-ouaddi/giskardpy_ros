@@ -8,6 +8,10 @@ from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.world_entity import Body
 
 # Custom Imports
+import sys
+import os
+# Allow importing from sibling directory 'skills'
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from motion_engine import GiskardMotionEngine
 from config import DualArmConfig
 from skills import PickSkill, PlaceSkill, HandoverSkill, GripperController
