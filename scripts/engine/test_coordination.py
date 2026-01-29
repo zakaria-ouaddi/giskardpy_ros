@@ -25,8 +25,8 @@ except ImportError:
 # --- CONFIGURATION ---
 # UPDATED: Using the RIGHT gripper topic
 GRIPPER_TOPIC = '/right_gripper/robotiq_gripper_controller/gripper_cmd'
-ROBOT_TIP_LINK = "r_gripper_tool_frame"
-WORLD_FRAME = "map2"
+ROBOT_TIP_LINK = "map2/r_gripper_tool_frame"
+WORLD_FRAME = "map2/map2"
 
 OBJECT_NAME = "milk_box"
 TABLE_NAME = "table"
