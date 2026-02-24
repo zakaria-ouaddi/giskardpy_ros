@@ -18,8 +18,9 @@ from giskardpy_ros.python_interface.python_interface import (
 from giskardpy_ros.ros2 import rospy
 from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.exceptions import WorldEntityNotFoundError
-from semantic_digital_twin.spatial_types import TransformationMatrix
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 import semantic_digital_twin.spatial_types.spatial_types as cas
+from krrood.symbolic_math.symbolic_math import trinary_logic_or
 
 
 class InteractiveMarkerNode:
@@ -142,7 +143,7 @@ class InteractiveMarkerNode:
             self.giskard.node_handle.get_logger().info(f"Sending goal for {marker_name}")
 
             # Calculate Goal
-            goal = TransformationMatrix.from_xyz_quaternion(
+            goal = HomogeneousTransformationMatrix.from_xyz_quaternion(
                 pos_x=feedback.pose.position.x,
                 pos_y=feedback.pose.position.y,
                 pos_z=feedback.pose.position.z,
@@ -171,7 +172,7 @@ class InteractiveMarkerNode:
             msc.add_node(collision_avoidance)
             end = EndMotion()
             msc.add_node(end)
-            end.start_condition = cas.trinary_logic_or(cart_goal.observation_variable, max_traj.observation_variable)
+            end.start_condition = trinary_logic_or(cart_goal.observation_variable, max_traj.observation_variable)
 
             self.giskard.execute_async(msc)
 

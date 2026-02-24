@@ -44,7 +44,7 @@ class DualArmOrchestrator:
         pose = create_pose(x, y, z, frame=self.config.ROOT_FRAME)
         p = cas.Point3(pose.pose.position.x, pose.pose.position.y, pose.pose.position.z)
         q = cas.Quaternion(pose.pose.orientation.x, pose.pose.orientation.y, pose.pose.orientation.z, pose.pose.orientation.w)
-        parent_T_pose = cas.TransformationMatrix.from_point_rotation_matrix(p, q.to_rotation_matrix())
+        parent_T_pose = cas.HomogeneousTransformationMatrix.from_point_rotation_matrix(p, q.to_rotation_matrix())
         
         with self.engine.giskard.world.modify_world():
             # Robustly remove existing object if it exists

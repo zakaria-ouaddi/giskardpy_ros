@@ -16,8 +16,9 @@ from giskardpy.motion_statechart.tasks.joint_tasks import JointPositionList, Joi
 from giskardpy.motion_statechart.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.model.collision_matrix_manager import CollisionRequest, CollisionAvoidanceTypes
 from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
-from semantic_digital_twin.spatial_types import TransformationMatrix
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 import semantic_digital_twin.spatial_types.spatial_types as cas
+from krrood.symbolic_math.symbolic_math import Scalar
 from semantic_digital_twin.world_description.world_entity import Body
 
 from semantic_digital_twin.world_description.connections import FixedConnection
@@ -173,6 +174,20 @@ class GiskardMotionEngine:
         except:
              print(f"Failed to find body {body_name}")
 
+    def allow_all_object_collisions(self, body_name: str):
+        try:
+             obj_body = self._resolve_entity_name(body_name)
+             req = CollisionRequest(
+                type_=CollisionAvoidanceTypes.ALLOW_COLLISION,
+                body_group1=[obj_body],
+                body_group2=[],
+                distance=0.05
+            )
+             self.persistent_collision_entries.append(req)
+             print(f"Persistent ALLOW: {body_name} <-> ALL")
+        except:
+             print(f"Failed to find body {body_name}")
+
     def allow_gripper_self_collision(self):
         gripper_bodies = self._get_gripper_links()
         if not gripper_bodies:
@@ -205,7 +220,7 @@ class GiskardMotionEngine:
 
         if safe_entries:
             allow_col = CollisionAvoidance(collision_entries=safe_entries)
-            allow_col.start_condition = cas.TrinaryTrue
+            allow_col.start_condition = Scalar.const_true()
             msc.add_node(allow_col)
 
     def move_joints(self, joint_positions: dict, speed_limit: float = 1.0):
@@ -241,7 +256,7 @@ class GiskardMotionEngine:
                 
         print("Giskard Engine shutdown complete.")
 
-    def _to_giskard_pose(self, pose: PoseStamped) -> TransformationMatrix:
+    def _to_giskard_pose(self, pose: PoseStamped) -> HomogeneousTransformationMatrix:
         p = cas.Point3(pose.pose.position.x, pose.pose.position.y, pose.pose.position.z)
         q = cas.Quaternion(
             pose.pose.orientation.x, 
@@ -256,11 +271,11 @@ class GiskardMotionEngine:
             print(f"Error resolving frame {frame_name}: {e}")
             raise
         
-        return cas.TransformationMatrix.from_point_rotation_matrix(
+        return cas.HomogeneousTransformationMatrix.from_point_rotation_matrix(
             p, q.to_rotation_matrix(), reference_frame=ref_frame
         )
 
-    def _to_ros_pose(self, tf: TransformationMatrix, frame_id: str) -> PoseStamped:
+    def _to_ros_pose(self, tf: HomogeneousTransformationMatrix, frame_id: str) -> PoseStamped:
         p = PoseStamped()
         p.header.frame_id = frame_id
         p.header.stamp = rospy.node.get_clock().now().to_msg()
@@ -281,10 +296,14 @@ class GiskardMotionEngine:
             obj_body = self.giskard.world.get_body_by_name(object_name)
             parent_link = self._resolve_entity_name(link_name)
             
-            parent_T_obj = self.giskard.world.compute_forward_kinematics(
-                root=parent_link,
-                tip=obj_body
-            )
+            expr = self.giskard.world.compute_forward_kinematics(root=parent_link, tip=obj_body)
+            import numpy as np
+            
+            # Force geometric Identity to perfectly center object between fingers and eliminate CasADi micro-drift
+            numeric_mat = np.eye(4)
+                
+            print(f"DEBUG [{object_name}]: attach_object numeric_mat = \n{numeric_mat}")
+            parent_T_obj = cas.HomogeneousTransformationMatrix(numeric_mat)
             
             new_connection = FixedConnection(
                 parent=parent_link,
@@ -298,16 +317,22 @@ class GiskardMotionEngine:
         time.sleep(wait_time)
         print(f"Attached {object_name} to {link_name}.")
 
-    def detach_object(self, object_name: str, wait_time: float = 0.5):
+    def detach_object(self, object_name: str, pose: Optional[PoseStamped] = None, wait_time: float = 0.5):
         print(f"Detaching {object_name}...")
         with self.giskard.world.modify_world():
             obj_body = self.giskard.world.get_body_by_name(object_name)
             root_link = self.giskard.world.root
             
-            root_T_obj = self.giskard.world.compute_forward_kinematics(
-                root=root_link,
-                tip=obj_body
-            )
+            if pose is not None:
+                root_T_obj = self._to_giskard_pose(pose)
+            else:
+                expr = self.giskard.world.compute_forward_kinematics(root=root_link, tip=obj_body)
+                import numpy as np
+                
+                # Force geometric Identity to eliminate CasADi numerical drift
+                numeric_mat = np.eye(4)
+                        
+                root_T_obj = cas.HomogeneousTransformationMatrix(numeric_mat)
             
             new_connection = FixedConnection(
                 parent=root_link,
@@ -321,7 +346,7 @@ class GiskardMotionEngine:
         time.sleep(wait_time)
         print(f"Detached {object_name}.")
 
-    def move_to_pose(self, pose: PoseStamped, object_to_allow_collision: Optional[str] = None, environment_objects_to_allow_collision: List[str] = [], linear_speed: float = 0.2, angular_speed: float = 0.2, tip_link: Optional[str] = None):
+    def move_to_pose(self, pose: PoseStamped, object_to_allow_collision: Optional[str] = None, environment_objects_to_allow_collision: List[str] = [], linear_speed: float = 0.2, angular_speed: float = 0.2, tip_link: Optional[str] = None, allow_gripper_to_object: bool = True):
         print(f"Moving to pose: {pose.pose.position}")
         
         msc = MotionStatechart()
@@ -346,19 +371,21 @@ class GiskardMotionEngine:
         collision_entries = []
         
         if object_to_allow_collision:
-            # Fixed: Allow collision for ALL gripper links (fingers, etc), not just the tip
-            gripper_bodies = self._get_gripper_links(actual_tip_link)
             obj_body = self._resolve_entity_name(object_to_allow_collision)
             
-            collision_entries.append(
-                CollisionRequest(
-                    type_=CollisionAvoidanceTypes.ALLOW_COLLISION,
-                    body_group1=gripper_bodies,
-                    body_group2=[obj_body],
-                    distance=0.05
+            # 1. Allow Gripper <-> Object (for approaching to pick)
+            if allow_gripper_to_object:
+                gripper_bodies = self._get_gripper_links(actual_tip_link)
+                collision_entries.append(
+                    CollisionRequest(
+                        type_=CollisionAvoidanceTypes.ALLOW_COLLISION,
+                        body_group1=gripper_bodies,
+                        body_group2=[obj_body],
+                        distance=0.05
+                    )
                 )
-            )
             
+            # 2. Allow Object <-> Environment (for pushing into things / lifting from stack)
             for env_name in environment_objects_to_allow_collision:
                 try:
                     env_body = self._resolve_entity_name(env_name)
@@ -388,7 +415,9 @@ class GiskardMotionEngine:
         gripper_bodies = []
         for body in all_bodies:
             name = str(body.name)
-            if "gripper" in name or "finger" in name or "robotiq" in name or "knuckle" in name or "hand" in name:
+            if ("gripper" in name or "finger" in name or "robotiq" in name or 
+                "knuckle" in name or "hand" in name or "tool0" in name or 
+                "flange" in name or "wrist" in name):
                 gripper_bodies.append(body)
         
         print(f"DEBUG: _get_gripper_links found {len(gripper_bodies)} links. Names: {[str(b.name) for b in gripper_bodies]}")
@@ -650,7 +679,7 @@ class GiskardMotionEngine:
         
         grasp_tf = self._to_giskard_pose(grasp_pose)
         
-        offset_tf = cas.TransformationMatrix()
+        offset_tf = cas.HomogeneousTransformationMatrix()
         offset_tf[0, 3] = approach_offset[0]
         offset_tf[1, 3] = approach_offset[1]
         offset_tf[2, 3] = approach_offset[2]
@@ -762,7 +791,7 @@ class GiskardMotionEngine:
                         current_pos[2] + delta_pos[2]]
             
             # Create Waypoint
-            wp_tf = cas.TransformationMatrix()
+            wp_tf = cas.HomogeneousTransformationMatrix()
             wp_tf.pos = cas.Point3(*new_pos)
             wp_tf.ori = cas.Quaternion(*new_q)
             

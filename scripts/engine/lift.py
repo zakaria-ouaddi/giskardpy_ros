@@ -82,7 +82,7 @@ def add_box(world, name, size, pose_stamped):
         pose_stamped.pose.orientation.z, 
         pose_stamped.pose.orientation.w
     )
-    parent_T_pose = cas.TransformationMatrix.from_point_rotation_matrix(p, q.to_rotation_matrix())
+    parent_T_pose = cas.HomogeneousTransformationMatrix.from_point_rotation_matrix(p, q.to_rotation_matrix())
     
     with world.modify_world():
         existing_box = None

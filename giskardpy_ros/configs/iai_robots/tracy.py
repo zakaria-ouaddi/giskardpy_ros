@@ -1,7 +1,7 @@
 from typing import Optional, TYPE_CHECKING
 
 import numpy as np
-from pkg_resources import resource_filename
+
 
 from giskardpy.model.world_config import WorldWithFixedRobot
 from giskardpy_ros.configs.robot_interface_config import (

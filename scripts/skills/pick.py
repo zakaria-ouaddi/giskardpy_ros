@@ -31,6 +31,11 @@ class PickSkill(BaseSkill):
         
         tip_link = self.resolve_tip(arm)
         
+        # Ensure 'table' is always in environment_objects to allow picking from it
+        if "table" not in environment_objects:
+            environment_objects = list(environment_objects)
+            environment_objects.append("table")
+        
         with CollisionContext(self.engine):
             print(f"[{object_name}] Phase 1: Picking ({arm})")
             
@@ -89,6 +94,7 @@ class PickSkill(BaseSkill):
             # 3. Close Gripper & Attach
             self.close_gripper(arm)
             self.engine.attach_object(object_name, tip_link)
+            self.engine.allow_all_object_collisions(object_name)
             
             # 4. Lift
             # Start of fix constraint: "Ensure the 'Lifting' phase of the pick allows collision with the stack"
@@ -98,7 +104,8 @@ class PickSkill(BaseSkill):
                 environment_objects_to_allow_collision=environment_objects,
                 linear_speed=self.config.LINEAR_SPEED, 
                 angular_speed=self.config.ANGULAR_SPEED,
-                tip_link=tip_link
+                tip_link=tip_link,
+                allow_gripper_to_object=False
             )
             time.sleep(2)
             

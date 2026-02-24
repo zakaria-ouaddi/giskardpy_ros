@@ -70,7 +70,7 @@ def is_ros_message(obj: Any) -> bool:
 
 # %% to ros
 def to_ros_message(data):
-    if isinstance(data, cas.TransformationMatrix):
+    if isinstance(data, cas.HomogeneousTransformationMatrix):
         return trans_matrix_to_pose_stamped(data)
     if isinstance(data, cas.Point3):
         return point3_to_point_stamped(data)
@@ -171,7 +171,9 @@ def color_rgba_to_ros_msg(data: Color) -> std_msgs.ColorRGBA:
 
 
 def trans_matrix_to_pose_stamped(
-    data: cas.TransformationMatrix,
+    data: cas.HomogeneousTransformationMatrix,
+    current_unit: str = "rad",
+    target_unit: str = "rad",
 ) -> geometry_msgs.PoseStamped:
     pose_stamped = geometry_msgs.PoseStamped()
     pose_stamped.header.frame_id = str(data.reference_frame.name.name)
@@ -212,7 +214,7 @@ def point3_to_point_stamped(data: cas.Point3) -> geometry_msgs.PointStamped:
 
 
 def trans_matrix_to_transform_stamped(
-    data: cas.TransformationMatrix,
+    data: cas.HomogeneousTransformationMatrix,
 ) -> geometry_msgs.TransformStamped:
     transform_stamped = geometry_msgs.TransformStamped()
     transform_stamped.header.frame_id = data.reference_frame.name.name
@@ -264,18 +266,25 @@ def trajectory_to_ros_trajectory(
 
 def world_to_tf_message(world: World, include_prefix: bool) -> tf2_msgs.TFMessage:
     tf_msg = tf2_msgs.TFMessage()
-    tf = world._forward_kinematic_manager.compute_tf()
+    fk_mgr = world._forward_kinematic_manager
+    connections = world.connections
+    tf_msg.transforms = create_tf_message_batch(len(connections))
     current_time = rospy.node.get_clock().now().to_msg()
-    tf_msg.transforms = create_tf_message_batch(
-        len(world._forward_kinematic_manager.tf)
-    )
-    for i, (parent_id, child_id) in enumerate(
-        world._forward_kinematic_manager.tf
-    ):
-        parent_link_name = world.get_kinematic_structure_entity_by_id(parent_id).name
-        child_link_name = world.get_kinematic_structure_entity_by_id(child_id).name
+    for i, connection in enumerate(connections):
+        parent = connection.parent
+        child = connection.child
 
-        pose = tf[i]
+        # Get root→parent and root→child 4x4 matrices from the pre-computed batch
+        parent_idx = fk_mgr.idx_start[parent.id]
+        child_idx = fk_mgr.idx_start[child.id]
+        map_T_parent = fk_mgr.forward_kinematics_for_all_bodies[parent_idx:parent_idx + 4]
+        map_T_child = fk_mgr.forward_kinematics_for_all_bodies[child_idx:child_idx + 4]
+
+        # parent_T_child = inv(root_T_parent) @ root_T_child
+        parent_T_child = np.linalg.inv(map_T_parent) @ map_T_child
+
+        parent_link_name = parent.name
+        child_link_name = child.name
         if not include_prefix:
             parent_link_name = parent_link_name.name
             child_link_name = child_link_name.name
@@ -284,13 +293,14 @@ def world_to_tf_message(world: World, include_prefix: bool) -> tf2_msgs.TFMessag
         p_T_c.header.frame_id = str(parent_link_name)
         p_T_c.header.stamp = current_time
         p_T_c.child_frame_id = str(child_link_name)
-        p_T_c.transform.translation.x = pose[0]
-        p_T_c.transform.translation.y = pose[1]
-        p_T_c.transform.translation.z = pose[2]
-        p_T_c.transform.rotation.x = pose[3]
-        p_T_c.transform.rotation.y = pose[4]
-        p_T_c.transform.rotation.z = pose[5]
-        p_T_c.transform.rotation.w = pose[6]
+        p_T_c.transform.translation.x = float(parent_T_child[0, 3])
+        p_T_c.transform.translation.y = float(parent_T_child[1, 3])
+        p_T_c.transform.translation.z = float(parent_T_child[2, 3])
+        q = quaternion_from_rotation_matrix(parent_T_child)
+        p_T_c.transform.rotation.x = float(q[0])
+        p_T_c.transform.rotation.y = float(q[1])
+        p_T_c.transform.rotation.z = float(q[2])
+        p_T_c.transform.rotation.w = float(q[3])
     return tf_msg
 
 
@@ -575,7 +585,7 @@ def ros_joint_state_to_giskard_joint_state(
 
 def pose_stamped_to_trans_matrix(
     msg: geometry_msgs.PoseStamped, world: World
-) -> cas.TransformationMatrix:
+) -> cas.HomogeneousTransformationMatrix:
     p = cas.Point3(
         x_init=msg.pose.position.x,
         y_init=msg.pose.position.y,
@@ -587,7 +597,7 @@ def pose_stamped_to_trans_matrix(
         z_init=msg.pose.orientation.z,
         w_init=msg.pose.orientation.w,
     ).to_rotation_matrix()
-    result = cas.TransformationMatrix.from_point_rotation_matrix(
+    result = cas.HomogeneousTransformationMatrix.from_point_rotation_matrix(
         point=p,
         rotation_matrix=R,
         reference_frame=world.get_kinematic_structure_entity_by_name(
@@ -597,12 +607,12 @@ def pose_stamped_to_trans_matrix(
     return result
 
 
-def pose_to_trans_matrix(msg: geometry_msgs.Pose) -> cas.TransformationMatrix:
+def pose_to_trans_matrix(msg: geometry_msgs.Pose) -> cas.HomogeneousTransformationMatrix:
     p = cas.Point3(msg.position.x, msg.position.y, msg.position.z)
     R = cas.Quaternion(
         msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w
     ).to_rotation_matrix()
-    result = cas.TransformationMatrix.from_point_rotation_matrix(
+    result = cas.HomogeneousTransformationMatrix.from_point_rotation_matrix(
         point=p, rotation_matrix=R, reference_frame=None
     )
     return result

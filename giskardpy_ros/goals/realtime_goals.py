@@ -998,7 +998,7 @@ class FollowNavPath(Goal):
     #         final_orientation = self.create_and_add_task('final orientation')
     #         frame_R_current = root_T_bf.to_rotation()
     #         current_R_frame_eval = context.world.compose_fk_evaluated_expression(self.tip, self.root).to_rotation()
-    #         frame_R_goal = cas.TransformationMatrix(path.poses[-1]).to_rotation()
+    #         frame_R_goal = cas.HomogeneousTransformationMatrix(path.poses[-1]).to_rotation()
     #         final_orientation.add_rotation_goal_constraints(frame_R_current=frame_R_current,
     #                                                         frame_R_goal=frame_R_goal,
     #                                                         current_R_frame_eval=current_R_frame_eval,

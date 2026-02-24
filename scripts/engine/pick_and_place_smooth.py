@@ -16,8 +16,9 @@ from giskardpy.motion_statechart.tasks.align_planes import AlignPlanes
 from giskardpy.motion_statechart.goals.collision_avoidance import CollisionAvoidance
 from giskardpy.motion_statechart.goals.templates import Sequence, Parallel
 from giskardpy.model.collision_matrix_manager import CollisionRequest, CollisionAvoidanceTypes
-from semantic_digital_twin.spatial_types import TransformationMatrix, Vector3, Point3
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix, Vector3, Point3
 import semantic_digital_twin.spatial_types.spatial_types as cas
+from krrood.symbolic_math.symbolic_math import Scalar
 
 # Constants
 LEFT_GRIPPER_ACTION_NAME = '/left_gripper/robotiq_gripper_controller/gripper_cmd'
@@ -83,7 +84,7 @@ class SmoothPickAndPlace:
         self.control_gripper(self.left_gripper, 0.0)
 
         # 2. Define Poses
-        # Convert ROS Pose to Giskard TransformationMatrix
+        # Convert ROS Pose to Giskard HomogeneousTransformationMatrix
         p = cas.Point3(grasp_pose.pose.position.x, grasp_pose.pose.position.y, grasp_pose.pose.position.z)
         q = cas.Quaternion(
             grasp_pose.pose.orientation.x, 
@@ -92,7 +93,7 @@ class SmoothPickAndPlace:
             grasp_pose.pose.orientation.w
         )
         ref_frame = self.giskard.world.get_kinematic_structure_entity_by_name(self.root_link)
-        grasp_tf = cas.TransformationMatrix.from_point_rotation_matrix(
+        grasp_tf = cas.HomogeneousTransformationMatrix.from_point_rotation_matrix(
             p, q.to_rotation_matrix(), reference_frame=ref_frame
         )
         
@@ -100,7 +101,7 @@ class SmoothPickAndPlace:
         # We assume the grasp pose Z points TOWARDS the object.
         # Adjust this based on your gripper's coordinate system!
         # Usually gripper Z is "forward". So we want to be -10cm in Z.
-        pre_grasp_offset = TransformationMatrix.from_xyz_rpy(x=0, y=0, z=-0.1)
+        pre_grasp_offset = HomogeneousTransformationMatrix.from_xyz_rpy(x=0, y=0, z=-0.1)
         pre_grasp_tf = grasp_tf * pre_grasp_offset
 
         # 3. Build Motion Statechart
@@ -169,7 +170,7 @@ class SmoothPickAndPlace:
         )
         msc.add_node(allow_obj)
         # Make sure this is active during the whole motion
-        allow_obj.start_condition = cas.TrinaryTrue 
+        allow_obj.start_condition = Scalar.const_true() 
 
         # --- End Condition ---
         end = EndMotion()
@@ -190,7 +191,7 @@ class SmoothPickAndPlace:
 
         # 6. Lift (Post-Grasp)
         # Move 20cm up
-        lift_tf = grasp_tf * TransformationMatrix.from_xyz_rpy(x=0, y=0, z=-0.2) # Backing out
+        lift_tf = grasp_tf * HomogeneousTransformationMatrix.from_xyz_rpy(x=0, y=0, z=-0.2) # Backing out
         
         msc_lift = MotionStatechart()
         task_lift = CartesianPose(
@@ -228,7 +229,7 @@ def add_box(world, name, size, pose_stamped):
         pose_stamped.pose.orientation.z, 
         pose_stamped.pose.orientation.w
     )
-    parent_T_pose = cas.TransformationMatrix.from_point_rotation_matrix(p, q.to_rotation_matrix())
+    parent_T_pose = cas.HomogeneousTransformationMatrix.from_point_rotation_matrix(p, q.to_rotation_matrix())
 
     with world.modify_world():
         box = Body(name=PrefixedName(name))

@@ -18,7 +18,7 @@ from giskardpy_ros.tree.blackboard_utils import (
     GiskardBlackboard,
 )
 from semantic_digital_twin.adapters.world_entity_kwargs_tracker import (
-    KinematicStructureEntityKwargsTracker,
+    WorldEntityWithIDKwargsTracker,
 )
 from semantic_digital_twin.world_description.connections import OmniDrive
 
@@ -35,7 +35,7 @@ class ParseActionGoal(GiskardBehavior):
         get_middleware().loginfo(
             f"Parsing goal #{GiskardBlackboard().move_action_server.goal_id} message."
         )
-        tracker = KinematicStructureEntityKwargsTracker.from_world(
+        tracker = WorldEntityWithIDKwargsTracker.from_world(
             GiskardBlackboard().executor.world
         )
         kwargs = tracker.create_kwargs()
@@ -49,19 +49,19 @@ class ParseActionGoal(GiskardBehavior):
         for entity in world.kinematic_structure_entities:
             # 1. Full string (e.g. "prefix/name")
             key_full = str(entity.name)
-            tracker._kinematic_structure_entities[key_full] = entity
+            tracker._world_entities_with_id[key_full] = entity
             entity_names.append(key_full)
             
             # 2. Raw name string (e.g. "name")
             if hasattr(entity.name, 'name'):
-                tracker._kinematic_structure_entities[str(entity.name.name)] = entity
+                tracker._world_entities_with_id[str(entity.name.name)] = entity
                 entity_names.append(str(entity.name.name))
 
             # 3. Explicit construction if PrefixedName
             if hasattr(entity.name, 'prefix') and entity.name.prefix:
-                 key_constructed = f"{entity.name.prefix}/{entity.name.name}"
-                 tracker._kinematic_structure_entities[key_constructed] = entity
-                 entity_names.append(key_constructed)
+                key_constructed = f"{entity.name.prefix}/{entity.name.name}"
+                tracker._world_entities_with_id[key_constructed] = entity
+                entity_names.append(key_constructed)
 
         get_middleware().loginfo(f"DEBUG: Available Entity Keys in Kwargs: {entity_names}")
 

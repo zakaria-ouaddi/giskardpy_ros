@@ -106,7 +106,7 @@ def add_box_to_giskard(world, name, size, pose_stamped: PoseStamped):
     p = cas.Point3(pose_stamped.pose.position.x, pose_stamped.pose.position.y, pose_stamped.pose.position.z)
     q = cas.Quaternion(pose_stamped.pose.orientation.x, pose_stamped.pose.orientation.y, 
                        pose_stamped.pose.orientation.z, pose_stamped.pose.orientation.w)
-    parent_T_pose = cas.TransformationMatrix.from_point_rotation_matrix(p, q.to_rotation_matrix())
+    parent_T_pose = cas.HomogeneousTransformationMatrix.from_point_rotation_matrix(p, q.to_rotation_matrix())
     
     with world.modify_world():
         box = Body(name=PrefixedName(name))

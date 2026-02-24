@@ -33,8 +33,8 @@ class HandoverManager:
         """
         self.engine = engine
         self.gripper_control_cb = gripper_control_cb 
-        self.left_tip = "tracy/l_gripper_tool_frame"
-        self.right_tip = "tracy/r_gripper_tool_frame"
+        self.left_tip = "l_gripper_tool_frame"
+        self.right_tip = "r_gripper_tool_frame"
 
     def detect_holding_state(self):
         """

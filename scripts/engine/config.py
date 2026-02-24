@@ -3,8 +3,8 @@ from dataclasses import dataclass
 @dataclass
 class DualArmConfig:
     # Frame Names
-    LEFT_TIP: str = "tracy/l_gripper_tool_frame"
-    RIGHT_TIP: str = "tracy/r_gripper_tool_frame"
+    LEFT_TIP: str = "l_gripper_tool_frame"
+    RIGHT_TIP: str = "r_gripper_tool_frame"
     ROOT_FRAME: str = "map2"
 
     # Motion Parameters

@@ -70,8 +70,8 @@ class PlaceSkill(BaseSkill):
             # IMPLICITLY ALLOW TABLE: "tracy/table" or "table"
             # It's a place action, usually on a table.
             local_stack_on = list(stack_on)
-            if "tracy/table" not in local_stack_on:
-                 local_stack_on.append("tracy/table")
+            if "table" not in local_stack_on:
+                 local_stack_on.append("table")
             if "table" not in local_stack_on:
                  local_stack_on.append("table")
             
@@ -88,13 +88,14 @@ class PlaceSkill(BaseSkill):
                 environment_objects_to_allow_collision=local_stack_on,
                 linear_speed=self.config.LINEAR_SPEED, 
                 angular_speed=self.config.ANGULAR_SPEED,
-                tip_link=tip_link
+                tip_link=tip_link,
+                allow_gripper_to_object=False
             )
             time.sleep(2)
             
             # 3. Open Gripper (Release)
             self.open_gripper(arm)
-            self.engine.detach_object(object_name)
+            self.engine.detach_object(object_name, pose=target_pose)
             
             # 4. Retreat
             # We MUST allow collision with the object we just released, and potentially the stack,

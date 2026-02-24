@@ -43,7 +43,7 @@ from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
 from semantic_digital_twin.world_description.connections import FixedConnection
 from semantic_digital_twin.world_description.geometry import Box, Scale
 from semantic_digital_twin.world_description.world_entity import Body
-from semantic_digital_twin.spatial_types import TransformationMatrix
+from semantic_digital_twin.spatial_types import HomogeneousTransformationMatrix
 
 # ... Helper to create poses ...
 def create_pose(x, y, z, roll=0, pitch=0, yaw=0, frame="map2"):
@@ -70,7 +70,7 @@ def add_box(world, name, size, pose_stamped):
         pose_stamped.pose.orientation.z, 
         pose_stamped.pose.orientation.w
     )
-    parent_T_pose = cas.TransformationMatrix.from_point_rotation_matrix(p, q.to_rotation_matrix())
+    parent_T_pose = cas.HomogeneousTransformationMatrix.from_point_rotation_matrix(p, q.to_rotation_matrix())
     
     with world.modify_world():
         box = Body(name=PrefixedName(name))
